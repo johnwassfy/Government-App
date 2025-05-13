@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../providers/user_provider.dart';
 import 'citizen_dashboard.dart';
 import 'advertiser_dashboard.dart';
+import 'admin_dashboard.dart';
 
 class LoginScreen extends StatelessWidget {
   final emailController = TextEditingController();
@@ -14,12 +15,15 @@ class LoginScreen extends StatelessWidget {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final authService = AuthService();
       final user = await authService.login(emailController.text, passwordController.text);
+      print(user?.role);
       if (user != null) {
         userProvider.setUser(user);
         if (user.role == 'citizen') {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CitizenDashboard()));
         } else if (user.role == 'advertiser') {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdvertiserDashboard()));
+        } else if (user.role == 'admin') {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboard()));
         }
       }
     } catch (e) {
