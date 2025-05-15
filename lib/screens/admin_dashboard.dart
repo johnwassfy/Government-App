@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'admin_announcements_screen.dart';
+import 'admin_advertisements_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:project/widgets/phone_number_section.dart';
 
 class AdminDashboard extends StatelessWidget {
   @override
@@ -51,12 +54,35 @@ class AdminDashboard extends StatelessWidget {
               // Navigate to Messages screen
             },
           ),
-          _DashboardCard(
-            title: 'Advertisements',
-            icon: Icons.ad_units,
-            onTap: () {
-              // Navigate to Advertisements screen
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('advertisements')
+                .where('isApproved', isEqualTo: false)
+                .where('reason', isEqualTo: 'null' )
+                .snapshots(),
+            builder: (context, snapshot) {
+              final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+              return _DashboardCard(
+                title: 'Advertisements ($pendingCount)',
+                icon: Icons.ad_units,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => AdminAdvertisementsScreen()),
+                ),
+              );
             },
+          ),
+          _DashboardCard(
+            title: 'Users',
+            icon: Icons.people,
+            onTap: () {
+              // Navigate to Users screen
+            },
+          ),
+          _DashboardCard(
+            title: 'Official Phone Numbers',
+            icon: Icons.phone,
+            expandableContent: OfficialPhoneNumbersSection(),
           ),
         ],
       ),
@@ -64,25 +90,62 @@ class AdminDashboard extends StatelessWidget {
   }
 }
 
-class _DashboardCard extends StatelessWidget {
+class _DashboardCard extends StatefulWidget {
   final String title;
   final IconData icon;
-  final VoidCallback onTap;
+  final Widget? expandableContent;
+  final VoidCallback? onTap;
 
   const _DashboardCard({
     required this.title,
     required this.icon,
-    required this.onTap,
+    this.expandableContent,
+    this.onTap,
   });
+
+  @override
+  State<_DashboardCard> createState() => _DashboardCardState();
+}
+
+class _DashboardCardState extends State<_DashboardCard> with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+
+  void _handleTap() {
+    if (widget.expandableContent != null) {
+      setState(() {
+        _isExpanded = !_isExpanded;
+      });
+    } else {
+      widget.onTap?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
-        leading: Icon(icon, size: 28),
-        title: Text(title, style: TextStyle(fontSize: 18)),
-        trailing: Icon(Icons.arrow_forward_ios),
-        onTap: onTap,
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(widget.icon, size: 28),
+            title: Text(widget.title, style: TextStyle(fontSize: 18)),
+            trailing: widget.expandableContent != null
+                ? Icon(_isExpanded ? Icons.expand_less : Icons.expand_more)
+                : Icon(Icons.arrow_forward_ios),
+            onTap: _handleTap,
+          ),
+          AnimatedCrossFade(
+            firstChild: SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              child: widget.expandableContent,
+            ),
+            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: Duration(milliseconds: 300),
+          ),
+        ],
       ),
     );
   }
