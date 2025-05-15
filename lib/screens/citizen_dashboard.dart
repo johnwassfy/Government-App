@@ -4,6 +4,8 @@ import '../providers/announcement_provider.dart';
 import 'announcement_detail_screen.dart';
 import '../models/advertisement_model.dart';
 import '../services/firebase_service.dart';
+import 'messages_screen.dart'; 
+import 'profile_screen.dart'; 
 
 class CitizenDashboard extends StatefulWidget {
   @override
@@ -13,6 +15,7 @@ class CitizenDashboard extends StatefulWidget {
 class _CitizenDashboardState extends State<CitizenDashboard> {
   late Future<void> _future;
   final FirebaseService _firebaseService = FirebaseService();
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -26,39 +29,37 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
 
   void _logout() {
     Navigator.pushReplacementNamed(context, '/');
-    print('Logging out...');
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Divider(thickness: 1.2),
-        SizedBox(height: 10),
-        Text(
-          title,
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-        ),
-        SizedBox(height: 10),
-      ],
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.blue.shade800),
+          SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue.shade800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildAnnouncementCard(ann) {
     return Card(
-      elevation: 3,
-      margin: EdgeInsets.symmetric(vertical: 6),
-      child: ListTile(
-        title: Text(
-          ann.subject,
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          ann.announcement.length > 80
-              ? '${ann.announcement.substring(0, 80)}...'
-              : ann.announcement,
-        ),
-        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16),
+      elevation: 2,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.push(
             context,
@@ -67,22 +68,108 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
             ),
           );
         },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ann.subject,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                ann.announcement.length > 100
+                    ? '${ann.announcement.substring(0, 100)}...'
+                    : ann.announcement,
+                style: TextStyle(fontSize: 16),
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'Read more',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward, size: 16, color: Colors.blue),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildAdCard(Advertisement ad) {
     return Card(
-      elevation: 3,
-      margin: EdgeInsets.symmetric(vertical: 6),
-      child: ListTile(
-        leading: Icon(Icons.campaign, color: Theme.of(context).colorScheme.primary),
-        title: Text(ad.subject, style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          ad.description.length > 80
-              ? '${ad.description.substring(0, 80)}...'
-              : ad.description,
+      elevation: 2,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.campaign, color: Colors.orange),
+                SizedBox(width: 8),
+                Text(
+                  'Sponsored',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              ad.subject,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              ad.description.length > 100
+                  ? '${ad.description.substring(0, 100)}...'
+                  : ad.description,
+              style: TextStyle(fontSize: 16),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: Colors.grey.shade400),
+          SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -94,19 +181,22 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text('Citizen Dashboard'),
+        title: Text('Citizen Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.blue.shade800,
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
               setState(() {
-                _future = _loadData(); // re-trigger the FutureBuilder
+                _future = _loadData();
               });
             },
             tooltip: 'Refresh',
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert),
+            icon: Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
               if (value == 'logout') _logout();
             },
@@ -119,59 +209,93 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
           ),
         ],
       ),
-      body: FutureBuilder(
-        future: _future,
-        builder: (context, snapshot) {
-          final announcements = provider.announcements;
+      body: _currentIndex == 0
+          ? FutureBuilder(
+              future: _future,
+              builder: (context, snapshot) {
+                final announcements = provider.announcements;
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                    ),
+                  );
+                }
 
-          return RefreshIndicator(
-            onRefresh: _loadData,
-            child: SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                return RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: Colors.blue,
+                  child: SingleChildScrollView(
+                    physics: AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        /// === Announcements ===
+                        _buildSectionTitle('Announcements', Icons.announcement),
+                        if (announcements.isEmpty)
+                          _buildEmptyState('No announcements available', Icons.announcement),
+                        ...announcements.map(_buildAnnouncementCard),
 
-                  /// === Announcements ===
-                  _buildSectionTitle('📢 Announcements'),
-                  if (announcements.isEmpty)
-                    Text('No announcements available.'),
-                  ...announcements.map(_buildAnnouncementCard),
+                        /// === Polls ===
+                        _buildSectionTitle('Polls', Icons.poll),
+                        _buildEmptyState('Polls section coming soon!', Icons.poll),
 
-                  /// === Polls ===
-                  _buildSectionTitle('🗳️ Polls'),
-                  // TODO: Replace with actual poll cards
-                  Text('Polls section coming soon!'),
+                        /// === Advertisements ===
+                        _buildSectionTitle('Advertisements', Icons.campaign),
+                        StreamBuilder<List<Advertisement>>(
+                          stream: _firebaseService.getApprovedAdvertisementsStream(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                ),
+                              );
+                            } else if (snapshot.hasError) {
+                              return _buildEmptyState(
+                                  'Error loading ads', Icons.error_outline);
+                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                              return _buildEmptyState(
+                                  'No approved ads available', Icons.campaign);
+                            }
 
-                  /// === Advertisements ===
-                  _buildSectionTitle('🧾 Advertisements'),
-                  StreamBuilder<List<Advertisement>>(
-                    stream: _firebaseService.getApprovedAdvertisementsStream(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Text('Error loading advertisements.');
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Text('No approved advertisements available.');
-                      }
-
-                      final ads = snapshot.data!;
-                      return Column(
-                        children: ads.map(_buildAdCard).toList(),
-                      );
-                    },
+                            final ads = snapshot.data!;
+                            return Column(
+                              children: ads.map(_buildAdCard).toList(),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
-          );
-        },
+                );
+              },
+            )
+          : _currentIndex == 1
+              ? MessagesScreen() // Replace with your MessagesScreen
+              : ProfileScreen(), // Replace with your ProfileScreen
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.blue.shade800,
+        unselectedItemColor: Colors.grey,
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

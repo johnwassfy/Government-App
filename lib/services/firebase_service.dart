@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project/models/announcement_model.dart';
 import 'package:project/models/comment_model.dart';
 import 'package:project/models/advertisement_model.dart'; // <-- Add this import
+import 'package:intl/intl.dart';
 
 class FirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -127,5 +128,154 @@ Future<void> deleteAdvertisement(String id) async {
 }
   Future<void> updateAdvertisement(String id, Advertisement ad) async {
     await _db.collection('advertisements').doc(id).update(ad.toJson()); // Changed to toJson
+  }
+
+
+    // --------- PHONE NUMBERS ---------
+
+  Stream<List<Map<String, dynamic>>> getOfficialPhoneNumbersStream() {
+    return _db
+        .collection('official_phone_numbers')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'description': data['description'] ?? '',
+                'number': data['number'] ?? '',
+              };
+            }).toList());
+  }
+
+  Future<void> addPhoneNumber(String description, String number) async {
+    await _db.collection('official_phone_numbers').add({
+      'description': description,
+      'number': number,
+    });
+  }
+
+  Future<void> updatePhoneNumber(String id, String description, String number) async {
+    await _db.collection('official_phone_numbers').doc(id).update({
+      'description': description,
+      'number': number,
+    });
+  }
+
+  Future<void> deletePhoneNumber(String id) async {
+    await _db.collection('official_phone_numbers').doc(id).delete();
+  }
+
+    // =============== MESSAGING FUNCTIONALITY ===============
+
+  // Get the chat document reference for a citizen
+  DocumentReference getCitizenChatDoc(String userId) {
+    return _db.collection('chats').doc('government_citizen_$userId');
+  }
+
+  // Send a message to/from government
+  Future<void> sendMessage(String userId, String text, bool isGovernment) async {
+    try {
+      final chatRef = _db.collection('chats').doc('government_citizen_$userId');
+      
+      // Create the message data
+      final messageData = {
+        'text': text,
+        'sender': isGovernment ? 'government' : userId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+      };
+
+      // Create the chat document if it doesn't exist
+      await _db.runTransaction((transaction) async {
+        // Get the current document
+        final doc = await transaction.get(chatRef);
+        
+        if (!doc.exists) {
+          // Create new chat document
+          transaction.set(chatRef, {
+            'participants': ['government', userId],
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastMessage': text,
+            'lastMessageTime': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Update existing chat document
+          transaction.update(chatRef, {
+            'lastMessage': text,
+            'lastMessageTime': FieldValue.serverTimestamp(),
+          });
+        }
+        
+        // Add the new message
+        transaction.set(chatRef.collection('messages').doc(), messageData);
+      });
+    } catch (e) {
+      print('Error sending message: $e');
+      throw Exception('Failed to send message');
+    }
+  }
+  // Get messages stream for a citizen
+  Stream<QuerySnapshot> getMessagesStream(String userId) {
+    return getCitizenChatDoc(userId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
+
+  // Format timestamp for display
+  String formatMessageTimestamp(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return DateFormat('h:mm a').format(date);
+  }
+
+  // Add these methods to your FirebaseService class
+
+  // Get all chats with citizens
+  Stream<QuerySnapshot> getAllChatsStream() {
+    return _db.collection('chats')
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots();
+  }
+
+  // Get user data for a chat
+  Future<Map<String, dynamic>> getUserData(String userId) async {
+    final doc = await _db.collection('users').doc(userId).get();
+    return doc.data() ?? {'name': 'Unknown User'};
+  }
+
+  // Mark messages as read
+  Future<void> markMessagesAsRead(String chatId) async {
+    final messages = await _db.collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .where('read', isEqualTo: false)
+        .where('sender', isNotEqualTo: 'government')
+        .get();
+
+    final batch = _db.batch();
+    for (var doc in messages.docs) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
+  }
+
+  // Get unread message count for admin
+  Stream<int> getUnreadMessageCount() {
+    return _db.collection('chats')
+        .snapshots()
+        .asyncMap((snapshot) async {
+          int total = 0;
+          for (var doc in snapshot.docs) {
+            final unread = await _db.collection('chats')
+                .doc(doc.id)
+                .collection('messages')
+                .where('read', isEqualTo: false)
+                .where('sender', isNotEqualTo: 'government')
+                .get();
+            total += unread.size;
+          }
+        return total;
+      }
+    );
   }
 }

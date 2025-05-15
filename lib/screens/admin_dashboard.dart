@@ -1,10 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:project/screens/admin_chat_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_advertisements_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project/widgets/phone_number_section.dart';
 
-class AdminDashboard extends StatelessWidget {
+class AdminDashboard extends StatefulWidget {
+  @override
+  _AdminDashboardState createState() => _AdminDashboardState();
+}
+
+class _AdminDashboardState extends State<AdminDashboard> {
+  int _currentIndex = 0;
+
+  // Bottom navigation bar items
+  final List<BottomNavigationBarItem> _bottomNavItems = [
+    BottomNavigationBarItem(
+      icon: Icon(Icons.dashboard),
+      label: 'Dashboard',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.message),
+      label: 'Messages',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.settings),
+      label: 'Settings',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.analytics),
+      label: 'Analytics',
+    ),
+  ];
+
+  // Screens for each tab
+  final List<Widget> _screens = [
+    // Dashboard Screen (index 0)
+    _DashboardScreen(),
+    // Messages Screen (index 1)
+    AdminChatScreen(),
+    // Settings Screen (index 2)
+    _PlaceholderScreen(title: 'Settings'),
+    // Analytics Screen (index 3)
+    _PlaceholderScreen(title: 'Analytics'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -14,8 +54,7 @@ class AdminDashboard extends StatelessWidget {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: () {
-            },
+            onPressed: () {},
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -29,60 +68,102 @@ class AdminDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: EdgeInsets.all(16),
+      body: _screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        items: _bottomNavItems,
+      ),
+    );
+  }
+}
+
+// Dashboard Screen Widget
+class _DashboardScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: EdgeInsets.all(16),
+      children: [
+        _DashboardCard(
+          title: 'Announcements',
+          icon: Icons.campaign,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => AdminAnnouncementsScreen()),
+          ),
+        ),
+        _DashboardCard(
+          title: 'Polls',
+          icon: Icons.poll,
+          onTap: () {
+            // Navigate to Polls screen
+          },
+        ),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('advertisements')
+              .where('isApproved', isEqualTo: false)
+              .where('reason', isEqualTo: 'null')
+              .snapshots(),
+          builder: (context, snapshot) {
+            final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+            return _DashboardCard(
+              title: 'Advertisements ($pendingCount)',
+              icon: Icons.ad_units,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AdminAdvertisementsScreen()),
+              ),
+            );
+          },
+        ),
+        _DashboardCard(
+          title: 'Users',
+          icon: Icons.people,
+          onTap: () {
+            // Navigate to Users screen
+          },
+        ),
+        _DashboardCard(
+          title: 'Official Phone Numbers',
+          icon: Icons.phone,
+          expandableContent: OfficialPhoneNumbersSection(isAdmin: true),
+        ),
+      ],
+    );
+  }
+}
+
+// Placeholder Screen for under-development tabs
+class _PlaceholderScreen extends StatelessWidget {
+  final String title;
+
+  const _PlaceholderScreen({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _DashboardCard(
-            title: 'Announcements',
-            icon: Icons.campaign,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AdminAnnouncementsScreen()),
-            ),
+          Icon(Icons.info, size: 64, color: Colors.blue),
+          SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
-          _DashboardCard(
-            title: 'Polls',
-            icon: Icons.poll,
-            onTap: () {
-              // Navigate to Polls screen
-            },
-          ),
-          _DashboardCard(
-            title: 'Messages',
-            icon: Icons.message,
-            onTap: () {
-              // Navigate to Messages screen
-            },
-          ),
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('advertisements')
-                .where('isApproved', isEqualTo: false)
-                .where('reason', isEqualTo: 'null' )
-                .snapshots(),
-            builder: (context, snapshot) {
-              final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
-              return _DashboardCard(
-                title: 'Advertisements ($pendingCount)',
-                icon: Icons.ad_units,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => AdminAdvertisementsScreen()),
-                ),
-              );
-            },
-          ),
-          _DashboardCard(
-            title: 'Users',
-            icon: Icons.people,
-            onTap: () {
-              // Navigate to Users screen
-            },
-          ),
-          _DashboardCard(
-            title: 'Official Phone Numbers',
-            icon: Icons.phone,
-            expandableContent: OfficialPhoneNumbersSection(),
+          SizedBox(height: 8),
+          Text(
+            'This section is under development',
+            style: TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -90,6 +171,7 @@ class AdminDashboard extends StatelessWidget {
   }
 }
 
+// Dashboard Card Widget
 class _DashboardCard extends StatefulWidget {
   final String title;
   final IconData icon;
@@ -107,7 +189,8 @@ class _DashboardCard extends StatefulWidget {
   State<_DashboardCard> createState() => _DashboardCardState();
 }
 
-class _DashboardCardState extends State<_DashboardCard> with SingleTickerProviderStateMixin {
+class _DashboardCardState extends State<_DashboardCard> 
+    with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
 
   void _handleTap() {
@@ -129,11 +212,14 @@ class _DashboardCardState extends State<_DashboardCard> with SingleTickerProvide
       child: Column(
         children: [
           ListTile(
-            leading: Icon(widget.icon, size: 28),
-            title: Text(widget.title, style: TextStyle(fontSize: 18)),
+            leading: Icon(widget.icon, size: 28, color: Colors.blue),
+            title: Text(
+              widget.title,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
             trailing: widget.expandableContent != null
                 ? Icon(_isExpanded ? Icons.expand_less : Icons.expand_more)
-                : Icon(Icons.arrow_forward_ios),
+                : Icon(Icons.arrow_forward_ios, color: Colors.blue),
             onTap: _handleTap,
           ),
           AnimatedCrossFade(

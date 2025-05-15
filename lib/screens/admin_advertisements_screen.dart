@@ -11,237 +11,346 @@ class AdminAdvertisementsScreen extends StatefulWidget {
 }
 
 class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
-  // Used to manually trigger refresh
   Key _refreshKey = UniqueKey();
 
   void _refresh() {
     setState(() {
-      _refreshKey = UniqueKey(); // change the key to trigger StreamBuilder rebuild
+      _refreshKey = UniqueKey();
     });
   }
 
+  // Sort ads by status: Pending → Approved → Declined
+  List<QueryDocumentSnapshot> _sortAds(List<QueryDocumentSnapshot> ads) {
+    return ads..sort((a, b) {
+      final aApproved = a['isApproved'] ?? false;
+      final bApproved = b['isApproved'] ?? false;
+      final aReason = a['reason'] ?? 'null';
+      final bReason = b['reason'] ?? 'null';
+
+      // Pending comes first
+      if (!aApproved && aReason == 'null' && (bApproved || bReason != 'null')) return -1;
+      if (!bApproved && bReason == 'null' && (aApproved || aReason != 'null')) return 1;
+
+      // Approved comes next
+      if (aApproved && !bApproved) return -1;
+      if (bApproved && !aApproved) return 1;
+
+      // Then sort by creation date (newest first)
+      final aDate = (a['createdAt'] as Timestamp).toDate();
+      final bDate = (b['createdAt'] as Timestamp).toDate();
+      return bDate.compareTo(aDate);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Advertisements'),
+        title: const Text('Advertisement Approvals'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.blue.shade800,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _refresh,
             tooltip: 'Refresh',
           )
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        key: _refreshKey,
-        stream: FirebaseFirestore.instance.collection('advertisements').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text('Error loading advertisements'));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade50, Colors.white],
+          ),
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          key: _refreshKey,
+          stream: FirebaseFirestore.instance.collection('advertisements')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text('Error loading advertisements', 
+                        style: TextStyle(fontSize: 18, color: Colors.red)),
+                  ],
+                ),
+              );
+            }
 
-          final ads = snapshot.data!.docs;
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),
+              );
+            }
 
-          if (ads.isEmpty) {
-            return const Center(child: Text('No advertisements found'));
-          }
+            final ads = _sortAds(snapshot.data!.docs);
 
-          return ListView.builder(
-            itemCount: ads.length,
-            itemBuilder: (context, index) {
-              final ad = ads[index];
-              final subject = ad['subject'] ?? 'No Subject';
-              final Timestamp createdAtTimestamp = ad['createdAt'] ?? Timestamp.now();
-              final createdAt = createdAtTimestamp.toDate();
-              final bool isApproved = ad['isApproved'] ?? false;
-              final String reason = ad['reason'] ?? '';
+            if (ads.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.ad_units_outlined, size: 48, color: Colors.blue.shade300),
+                    SizedBox(height: 16),
+                    Text('No advertisements found',
+                        style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  ],
+                ),
+              );
+            }
 
-              final DocumentReference createdByRef = ad['createdBy'];
-              final String userId = createdByRef.id;
+            return ListView.separated(
+              padding: EdgeInsets.all(16),
+              itemCount: ads.length,
+              separatorBuilder: (_, __) => SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final ad = ads[index];
+                final subject = ad['subject'] ?? 'No Subject';
+                final createdAt = (ad['createdAt'] as Timestamp).toDate();
+                final isApproved = ad['isApproved'] ?? false;
+                final reason = ad['reason'] ?? '';
+                final userId = (ad['createdBy'] as DocumentReference).id;
 
-              return FutureBuilder<String>(
-                future: FirebaseService().getUserFullName(userId),
-                builder: (context, userSnapshot) {
-                  if (userSnapshot.connectionState == ConnectionState.waiting) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text('Loading creator info...'),
+                return FutureBuilder<String>(
+                  future: FirebaseService().getUserFullName(userId),
+                  builder: (context, userSnapshot) {
+                    if (userSnapshot.connectionState == ConnectionState.waiting) {
+                      return _buildAdCard(
+                        context: context,
+                        subject: subject,
+                        createdAt: createdAt,
+                        status: 'Loading...',
+                        statusColor: Colors.grey,
+                        username: 'Loading...',
+                        isPending: false,
+                        reason: reason,
+                        onApprove: null,
+                        onDecline: null,
+                      );
+                    }
+
+                    final username = userSnapshot.data ?? 'Unknown User';
+                    final isPending = !isApproved && reason == 'null';
+
+                    return _buildAdCard(
+                      context: context,
+                      subject: subject,
+                      createdAt: createdAt,
+                      status: isApproved ? 'Approved' : isPending ? 'Pending' : 'Declined',
+                      statusColor: isApproved 
+                          ? Colors.green 
+                          : isPending 
+                              ? Colors.orange 
+                              : Colors.red,
+                      username: username,
+                      isPending: isPending,
+                      reason: reason,
+                      onApprove: isPending ? () async {
+                        try {
+                          final updatedAd = {
+                            ...ad.data() as Map<String, dynamic>,
+                            'isApproved': true,
+                          };
+                          await FirebaseService().updateAdvertisement(
+                            ad.id,
+                            Advertisement.fromJson(updatedAd),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to approve ad: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } : null,
+                      onDecline: isPending ? () {
+                        _showDeclineDialog(context, ad);
+                      } : null,
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showDeclineDialog(BuildContext context, QueryDocumentSnapshot ad) {
+    final TextEditingController reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Decline Advertisement', style: TextStyle(color: Colors.red)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Please provide a reason for declining this ad:'),
+            SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Enter decline reason',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('CANCEL'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              final declineReason = reasonController.text.trim();
+              if (declineReason.isNotEmpty) {
+                try {
+                  final updatedAd = {
+                    ...ad.data() as Map<String, dynamic>,
+                    'isApproved': false,
+                    'reason': declineReason,
+                  };
+                  await FirebaseService().updateAdvertisement(
+                    ad.id,
+                    Advertisement.fromJson(updatedAd),
+                  );
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to decline ad: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('SUBMIT', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdCard({
+    required BuildContext context,
+    required String subject,
+    required DateTime createdAt,
+    required String status,
+    required Color statusColor,
+    required String username,
+    required bool isPending,
+    required String reason,
+    VoidCallback? onApprove,
+    VoidCallback? onDecline,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    subject,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            _buildInfoRow(Icons.person, username),
+            _buildInfoRow(Icons.calendar_today, 
+                '${createdAt.day}/${createdAt.month}/${createdAt.year} ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}'),
+            if (!isPending && reason.isNotEmpty && reason != 'null')
+              _buildInfoRow(Icons.info, 'Decline Reason: $reason', color: Colors.red),
+            if (isPending)
+              Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: Icon(Icons.close, color: Colors.red),
+                      label: Text('Decline', style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                    );
-                  }
-
-                  final username = userSnapshot.data ?? 'Unknown User';
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    subject,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: isApproved ? Colors.green.shade100 : reason.contains('null')? const Color.fromARGB(255, 233, 255, 134) : const Color.fromARGB(255, 255, 110, 110),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    isApproved ? 'Approved' : reason.contains('null')?  'Pending' :'Declined',
-                                    style: TextStyle(
-                                      color: isApproved ? Colors.green.shade800 : reason.contains('null')? Colors.orange.shade800 : Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Created At: ${createdAt.toLocal()}',
-                              style: const TextStyle(fontSize: 14, color: Colors.grey),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Created By: $username',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            if (!isApproved && (reason == "null" || reason.isEmpty))
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton.icon(
-                                    onPressed: () async {
-                                      try {
-                                        final updatedAd = {
-                                          ...ad.data() as Map<String, dynamic>,
-                                          'isApproved': true,
-                                        };
-                                        await FirebaseService().updateAdvertisement(
-                                          ad.id,
-                                          Advertisement.fromJson(updatedAd),
-                                        );
-                                      } catch (e) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Failed to approve ad: $e')),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.check),
-                                    label: const Text('Approve'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) {
-                                          final TextEditingController reasonController = TextEditingController();
-                                          return AlertDialog(
-                                            title: const Text('Decline Advertisement'),
-                                            content: TextField(
-                                              controller: reasonController,
-                                              maxLines: 3,
-                                              decoration: const InputDecoration(
-                                                hintText: 'Enter decline reason',
-                                              ),
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.of(context).pop(),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () async {
-                                                  final declineReason = reasonController.text.trim();
-                                                  if (declineReason.isNotEmpty) {
-                                                    try {
-                                                      final updatedAd = {
-                                                        ...ad.data() as Map<String, dynamic>,
-                                                        'isApproved': false,
-                                                        'reason': declineReason,
-                                                      };
-                                                      await FirebaseService().updateAdvertisement(
-                                                        ad.id,
-                                                        Advertisement.fromJson(updatedAd),
-                                                      );
-                                                      Navigator.of(context).pop();
-                                                    } catch (e) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(content: Text('Failed to decline ad: $e')),
-                                                      );
-                                                    }
-                                                  }
-                                                },
-                                                child: const Text('Submit'),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      );
-                                    },
-                                    icon: const Icon(Icons.cancel),
-                                    label: const Text('Decline'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else if (reason != "null" && reason.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Text(
-                                  'Decline Reason: $reason',
-                                  style: const TextStyle(fontSize: 14, color: Colors.redAccent),
-                                ),
-                              ),
-                          ],
+                      onPressed: onDecline,
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: onApprove,
+                      icon: Icon(Icons.check, color: Colors.white),
+                      label: Text('Approve', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                     ),
-                  );
-                },
-              );
-            },
-          );
-        },
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, {Color? color}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color ?? Colors.grey),
+          SizedBox(width: 8),
+          Text(text, style: TextStyle(color: color ?? Colors.grey.shade700)),
+        ],
       ),
     );
   }
