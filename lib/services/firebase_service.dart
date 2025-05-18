@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project/models/announcement_model.dart';
 import 'package:project/models/comment_model.dart';
-import 'package:project/models/advertisement_model.dart'; // <-- Add this import
+import 'package:project/models/advertisement_model.dart';
+import 'package:project/models/poll_model.dart';
 import 'package:intl/intl.dart';
 
 class FirebaseService {
@@ -101,7 +102,6 @@ class FirebaseService {
           .map((doc) => Advertisement.fromJson(doc.data()))
           .toList());
   }
-
 
   Stream<List<Advertisement>> getAdvertisementsStream() {
   final String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -278,4 +278,71 @@ Future<void> deleteAdvertisement(String id) async {
       }
     );
   }
+
+  // ---------------- POLLS ----------------
+  Future<void> createPoll(Poll poll) async {
+  try {
+    await _db.collection('polls').add(poll.toMap());
+  } catch (e) {
+    print('Error creating poll: $e');
+    throw Exception('Failed to create poll');
+  }
+}
+
+  Future<void> updatePoll(String id, Poll poll) async {
+    await _db.collection('polls').doc(id).update(poll.toMap());
+  }
+
+  Future<void> deletePoll(String id) async {
+    await _db.collection('polls').doc(id).delete();
+  }
+
+  
+  Future<void> closePoll(String id) async {
+    await _db.collection('polls').doc(id).update({'isActive': false});
+  }
+
+  Future<bool> voteOnPoll({
+    required String pollId,
+    required String userId,
+    required bool isYesVote,
+  }) async {
+    try {
+      return await _db.runTransaction<bool>((transaction) async {
+        final pollRef = _db.collection('polls').doc(pollId);
+        final pollDoc = await transaction.get(pollRef);
+
+        if (!pollDoc.exists) throw Exception('Poll not found');
+        if (pollDoc.data()?['votedUserIds']?.contains(userId) ?? false) {
+          return false; // Already voted
+        }
+
+        // Update the poll with the vote
+        final updateData = {
+          'votedUserIds': FieldValue.arrayUnion([userId]),
+        };
+
+        // Increment the correct vote count
+        if (isYesVote) {
+          updateData['yesVotes'] = FieldValue.increment(1);
+        } else {
+          updateData['noVotes'] = FieldValue.increment(1);
+        }
+
+        transaction.update(pollRef, updateData);
+        return true;
+      });
+    } catch (e) {
+      throw Exception('Failed to vote: $e');
+    }
+  }
+
+Stream<List<Poll>> getPollsStream() {
+  return _db.collection('polls')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs
+          .map((doc) => Poll.fromDocument(doc))
+          .toList());
+}
 }

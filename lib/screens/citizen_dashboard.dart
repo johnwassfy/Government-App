@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/announcement_provider.dart';
-import 'announcement_detail_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+import '../models/announcement_model.dart';
 import '../models/advertisement_model.dart';
+import '../models/poll_model.dart';
+import '../providers/announcement_provider.dart';
 import '../services/firebase_service.dart';
-import 'messages_screen.dart'; 
-import 'profile_screen.dart'; 
+import 'announcement_detail_screen.dart';
+import 'messages_screen.dart';
+import 'profile_screen.dart';
+import 'package:project/screens/poll_details_screen.dart';
+import 'emergency_contacts_screen.dart';
 
 class CitizenDashboard extends StatefulWidget {
   @override
@@ -16,6 +22,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
   late Future<void> _future;
   final FirebaseService _firebaseService = FirebaseService();
   int _currentIndex = 0;
+  final Map<String, bool> _userVotes = {}; // Track votes in memory
 
   @override
   void initState() {
@@ -28,7 +35,166 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
   }
 
   void _logout() {
+    FirebaseAuth.instance.signOut();
     Navigator.pushReplacementNamed(context, '/');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<AnnouncementProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text('Citizen Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.blue.shade800,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _future = _loadData();
+              });
+            },
+            tooltip: 'Refresh',
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'logout') _logout();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'logout',
+                child: Text('Log Out'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      body: _buildBody(provider),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.blue.shade800,
+        unselectedItemColor: Colors.grey,
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'Messages',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.phone),
+            label: 'Emergency',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(AnnouncementProvider provider) {
+    if (_currentIndex == 1) return MessagesScreen();
+    if (_currentIndex == 2) return EmergencyContactsScreen();
+    if (_currentIndex == 3) return ProfileScreen();
+
+    return FutureBuilder(
+      future: _future,
+      builder: (context, snapshot) {
+        final announcements = provider.announcements;
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: _loadData,
+          color: Colors.blue,
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle('Announcements', Icons.announcement),
+                if (announcements.isEmpty)
+                  _buildEmptyState('No announcements available', Icons.announcement),
+                ...announcements.map(_buildAnnouncementCard),
+
+                _buildSectionTitle('Active Polls', Icons.poll),
+                _buildPollsSection(),
+
+                _buildSectionTitle('Advertisements', Icons.campaign),
+                _buildAdvertisementsSection(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPollsSection() {
+    return StreamBuilder<List<Poll>>(
+      stream: _firebaseService.getPollsStream().map((polls) => 
+          polls.where((poll) => poll.isActive).toList()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return _buildEmptyState('Error loading polls', Icons.error_outline);
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState('No active polls available', Icons.poll);
+        }
+
+        final polls = snapshot.data!;
+        return Column(
+          children: polls.map(_buildPollCard).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildAdvertisementsSection() {
+    return StreamBuilder<List<Advertisement>>(
+      stream: _firebaseService.getApprovedAdvertisementsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return _buildEmptyState('Error loading ads', Icons.error_outline);
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState('No approved ads available', Icons.campaign);
+        }
+
+        final ads = snapshot.data!;
+        return Column(
+          children: ads.map(_buildAdCard).toList(),
+        );
+      },
+    );
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {
@@ -51,7 +217,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     );
   }
 
-  Widget _buildAnnouncementCard(ann) {
+  Widget _buildAnnouncementCard(Announcement ann) {
     return Card(
       elevation: 2,
       margin: EdgeInsets.symmetric(vertical: 8),
@@ -105,6 +271,165 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPollCard(Poll poll) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final totalVotes = poll.yesVotes + poll.noVotes;
+    final yesPercentage = totalVotes > 0 ? (poll.yesVotes / totalVotes * 100).round() : 0;
+    final noPercentage = totalVotes > 0 ? (poll.noVotes / totalVotes * 100).round() : 0;
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final hasVoted = _userVotes.containsKey(poll.id) || 
+                    (currentUser != null && poll.votedUserIds.contains(currentUser.uid));
+
+    return Card(
+      elevation: 2,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PollDetailsScreen(poll: poll),
+            ),
+          );
+        },
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    poll.title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: poll.isActive 
+                        ? Colors.green.withOpacity(0.2)
+                        : Colors.grey.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    poll.isActive ? 'ACTIVE' : 'CLOSED',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: poll.isActive ? Colors.green.shade800 : Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              poll.description,
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                SizedBox(width: 8),
+                Text(
+                  'Ends: ${dateFormat.format(poll.endDate)}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
+                Spacer(),
+                Icon(Icons.people_alt_outlined, size: 16, color: Colors.grey),
+                SizedBox(width: 8),
+                Text(
+                  '$totalVotes votes',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            if (poll.isActive && !hasVoted) ...[
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _voteOnPoll(poll.id, true),
+                      child: Text('Yes'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.green),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _voteOnPoll(poll.id, false),
+                      child: Text('No'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (hasVoted || !poll.isActive) ...[
+              SizedBox(height: 16),
+              LinearProgressIndicator(
+                value: totalVotes > 0 ? poll.yesVotes / totalVotes : 0,
+                backgroundColor: Colors.red.shade100,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Yes: '),
+                        TextSpan(
+                          text: '$yesPercentage%',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: ' (${poll.yesVotes})'),
+                      ],
+                    ),
+                  ),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'No: '),
+                        TextSpan(
+                          text: '$noPercentage%',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: ' (${poll.noVotes})'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
       ),
     );
   }
@@ -174,129 +499,40 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final provider = Provider.of<AnnouncementProvider>(context);
+  Future<void> _voteOnPoll(String pollId, bool isYesVote) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
 
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text('Citizen Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.blue.shade800,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _future = _loadData();
-              });
-            },
-            tooltip: 'Refresh',
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) {
-              if (value == 'logout') _logout();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'logout',
-                child: Text('Log Out'),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: _currentIndex == 0
-          ? FutureBuilder(
-              future: _future,
-              builder: (context, snapshot) {
-                final announcements = provider.announcements;
+      if (_userVotes.containsKey(pollId)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('You have already voted on this poll')),
+        );
+        return;
+      }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                    ),
-                  );
-                }
+      final result = await _firebaseService.voteOnPoll(
+        pollId: pollId,
+        userId: currentUser.uid,
+        isYesVote: isYesVote,
+      );
 
-                return RefreshIndicator(
-                  onRefresh: _loadData,
-                  color: Colors.blue,
-                  child: SingleChildScrollView(
-                    physics: AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// === Announcements ===
-                        _buildSectionTitle('Announcements', Icons.announcement),
-                        if (announcements.isEmpty)
-                          _buildEmptyState('No announcements available', Icons.announcement),
-                        ...announcements.map(_buildAnnouncementCard),
-
-                        /// === Polls ===
-                        _buildSectionTitle('Polls', Icons.poll),
-                        _buildEmptyState('Polls section coming soon!', Icons.poll),
-
-                        /// === Advertisements ===
-                        _buildSectionTitle('Advertisements', Icons.campaign),
-                        StreamBuilder<List<Advertisement>>(
-                          stream: _firebaseService.getApprovedAdvertisementsStream(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                                ),
-                              );
-                            } else if (snapshot.hasError) {
-                              return _buildEmptyState(
-                                  'Error loading ads', Icons.error_outline);
-                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return _buildEmptyState(
-                                  'No approved ads available', Icons.campaign);
-                            }
-
-                            final ads = snapshot.data!;
-                            return Column(
-                              children: ads.map(_buildAdCard).toList(),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            )
-          : _currentIndex == 1
-              ? MessagesScreen() // Replace with your MessagesScreen
-              : ProfileScreen(), // Replace with your ProfileScreen
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue.shade800,
-        unselectedItemColor: Colors.grey,
-        items: [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
+      if (result) {
+        setState(() {
+          _userVotes[pollId] = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Your ${isYesVote ? 'yes' : 'no'} vote was recorded')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to record your vote')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to vote: $e')),
+      );
+    }
   }
 }

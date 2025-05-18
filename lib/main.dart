@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/announcement_provider.dart';
 import 'screens/start_screen.dart';
+import 'services/firebase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AnnouncementProvider()),
+        Provider(create: (_) => FirebaseService()), // Add this line
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

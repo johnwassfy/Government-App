@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project/screens/admin_chat_screen.dart';
+import 'package:project/screens/admin_polls_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_advertisements_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -103,9 +104,10 @@ class _DashboardScreen extends StatelessWidget {
         _DashboardCard(
           title: 'Polls',
           icon: Icons.poll,
-          onTap: () {
-            // Navigate to Polls screen
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => AdminPollsScreen()),
+          ),
         ),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance

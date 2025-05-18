@@ -1,83 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'citizen_dashboard.dart';
 import 'package:project/services/firebase_service.dart';
 
-class MessagesScreen extends StatefulWidget {
+class AdminChatDetailScreen extends StatefulWidget {
+  final String userId;
+  final String userName;
+
+  const AdminChatDetailScreen({
+    required this.userId,
+    required this.userName,
+  });
+
   @override
-  _MessagesScreenState createState() => _MessagesScreenState();
+  _AdminChatDetailScreenState createState() => _AdminChatDetailScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> {
+class _AdminChatDetailScreenState extends State<AdminChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScrollController _scrollController = ScrollController();
 
   @override
-  void initState() {
-    super.initState();
-    _initializeChat();
-  }
-
-  Future<void> _initializeChat() async {
-    final userId = _auth.currentUser!.uid;
-    await _firebaseService.getCitizenChatDoc(userId).set({
-      'participants': ['government', userId],
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final userId = _auth.currentUser!.uid;
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => CitizenDashboard()),
-              (route) => false,
-            );
-          },
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Government Support'),
-            StreamBuilder<DocumentSnapshot>(
-              stream: _firebaseService.getCitizenChatDoc(userId).snapshots(),
-              builder: (context, snapshot) {
-                final status = snapshot.hasData && 
-                    (snapshot.data!.data() as Map<String, dynamic>?)?['status'] == 'online'
-                    ? 'Online'
-                    : 'Offline';
-                return Text(
-                  status,
-                  style: TextStyle(fontSize: 12),
-                );
-              },
-            ),
-          ],
-        ),
-        centerTitle: false,
+        title: Text(widget.userName, style: TextStyle(color: Colors.white)),
+        centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.blue.shade800,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.more_vert),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.getMessagesStream(userId),
+              stream: _firebaseService.getMessagesStream(widget.userId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error loading messages'));
@@ -116,7 +76,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               },
             ),
           ),
-          _buildMessageInput(userId),
+          _buildMessageInput(),
         ],
       ),
     );
@@ -130,26 +90,26 @@ class _MessagesScreenState extends State<MessagesScreen> {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Align(
-        alignment: isGovernment ? Alignment.centerLeft : Alignment.centerRight,
+        alignment: isGovernment ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: isGovernment ? Colors.grey.shade200 : Colors.blue.shade800,
+            color: isGovernment ? Colors.blue.shade800 : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(text, style: TextStyle(
-                color: isGovernment ? Colors.black : Colors.white,
+                color: isGovernment ? Colors.white : Colors.black,
               )),
               SizedBox(height: 4),
               Text(time, style: TextStyle(
                 fontSize: 10,
-                color: isGovernment ? Colors.grey.shade600 : Colors.white70,
+                color: isGovernment ? Colors.white70 : Colors.grey.shade600,
               )),
             ],
           ),
@@ -158,7 +118,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 
-  Widget _buildMessageInput(String userId) {
+  Widget _buildMessageInput() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Colors.grey.shade100,
@@ -186,18 +146,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
               icon: Icon(Icons.send, color: Colors.white),
               onPressed: () async {
                 if (_messageController.text.isNotEmpty) {
-                  try {
-                    await _firebaseService.sendMessage(
-                      userId,
-                      _messageController.text,
-                      false, // isGovernment flag
-                    );
-                    _messageController.clear();
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to send message: $e')),
-                    );
-                  }
+                  await _firebaseService.sendMessage(
+                    widget.userId,
+                    _messageController.text,
+                    true, // isGovernment flag
+                  );
+                  _messageController.clear();
                 }
               },
             ),

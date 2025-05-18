@@ -49,7 +49,7 @@ class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
         title: const Text('Advertisement Approvals'),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
