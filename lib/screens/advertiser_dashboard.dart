@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firebase_service.dart';
 import '../models/advertisement_model.dart';
+import '../services/navigation_service.dart';
 import '../widgets/advertisement_form.dart';
 
 class AdvertiserDashboard extends StatefulWidget {
@@ -21,7 +22,7 @@ class _AdvertiserDashboardState extends State<AdvertiserDashboard> {
 
   void _logout() async {
     await FirebaseAuth.instance.signOut();
-    Navigator.pushReplacementNamed(context, '/');
+    NavigationService.navigateTo('/login');
   }
 
   Future<bool> _deleteAdvertisement(Advertisement ad) async {

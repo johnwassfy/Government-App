@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'login_screen.dart';
+import '../services/navigation_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -22,7 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         nameController.text,
         role,
       );
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginScreen()));
+      NavigationService.navigateTo('/login');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration failed: $e')),
@@ -34,6 +34,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            NavigationService.navigateTo('/');
+          },
+        ),
         title: Text("Create Account",
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
@@ -145,12 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               SizedBox(height: 20),
               TextButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => LoginScreen()),
-                  );
-                },
+                onPressed: () => NavigationService.navigateTo('/login'),
                 child: Text.rich(
                   TextSpan(
                     text: "Already have an account? ",

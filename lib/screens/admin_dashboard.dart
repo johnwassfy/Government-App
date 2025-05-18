@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:project/screens/admin_chat_screen.dart';
-import 'package:project/screens/admin_polls_screen.dart';
-import 'admin_announcements_screen.dart';
-import 'admin_advertisements_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project/widgets/phone_number_section.dart';
+import '../services/navigation_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   @override
@@ -60,7 +58,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'logout') {
-                Navigator.pushReplacementNamed(context, '/');
+                NavigationService.navigateTo('/');
               }
             },
             itemBuilder: (context) => [
@@ -93,52 +91,43 @@ class _DashboardScreen extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.all(16),
       children: [
-        _DashboardCard(
-          title: 'Announcements',
-          icon: Icons.campaign,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AdminAnnouncementsScreen()),
-          ),
-        ),
-        _DashboardCard(
-          title: 'Polls',
-          icon: Icons.poll,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AdminPollsScreen()),
-          ),
-        ),
-        StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('advertisements')
-              .where('isApproved', isEqualTo: false)
-              .where('reason', isEqualTo: 'null')
-              .snapshots(),
-          builder: (context, snapshot) {
-            final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
-            return _DashboardCard(
-              title: 'Advertisements ($pendingCount)',
-              icon: Icons.ad_units,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => AdminAdvertisementsScreen()),
-              ),
-            );
-          },
-        ),
-        _DashboardCard(
-          title: 'Users',
-          icon: Icons.people,
-          onTap: () {
-            // Navigate to Users screen
-          },
-        ),
-        _DashboardCard(
-          title: 'Official Phone Numbers',
-          icon: Icons.phone,
-          expandableContent: OfficialPhoneNumbersSection(isAdmin: true),
-        ),
+      _DashboardCard(
+        title: 'Announcements',
+        icon: Icons.campaign,
+        onTap: () => NavigationService.navigateTo('/admin/announcements'),
+      ),
+      _DashboardCard(
+        title: 'Polls',
+        icon: Icons.poll,
+        onTap: () => NavigationService.navigateTo('/admin/polls'),
+      ),
+      StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+          .collection('advertisements')
+          .where('isApproved', isEqualTo: false)
+          .where('reason', isEqualTo: 'null')
+          .snapshots(),
+        builder: (context, snapshot) {
+          final pendingCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+          return _DashboardCard(
+            title: 'Advertisements ($pendingCount)',
+            icon: Icons.ad_units,
+            onTap: () => NavigationService.navigateTo('/admin/advertisements'),
+          );
+        },
+      ),
+      _DashboardCard(
+        title: 'Users',
+        icon: Icons.people,
+        onTap: () {
+        // Navigate to Users screen
+        },
+      ),
+      _DashboardCard(
+        title: 'Official Phone Numbers',
+        icon: Icons.phone,
+        expandableContent: OfficialPhoneNumbersSection(isAdmin: true),
+      ),
       ],
     );
   }

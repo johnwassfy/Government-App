@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../providers/user_provider.dart';
-import 'citizen_dashboard.dart';
-import 'advertiser_dashboard.dart';
-import 'admin_dashboard.dart';
-import 'register_screen.dart';
+import '../services/navigation_service.dart';
 
 class LoginScreen extends StatelessWidget {
   final emailController = TextEditingController();
@@ -20,11 +17,11 @@ class LoginScreen extends StatelessWidget {
       if (user != null) {
         userProvider.setUser(user);
         if (user.role == 'citizen') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CitizenDashboard()));
+          NavigationService.replaceTo('/citizen');
         } else if (user.role == 'advertiser') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdvertiserDashboard()));
+          NavigationService.replaceTo('/advertiser');
         } else if (user.role == 'admin') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboard()));
+          NavigationService.replaceTo('/admin');
         }
       }
     } catch (e) {
@@ -36,6 +33,13 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            NavigationService.navigateTo('/');
+          },
+        ),
+        automaticallyImplyLeading: false,
         title: Text("Sign In",
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
@@ -113,10 +117,7 @@ class LoginScreen extends StatelessWidget {
               SizedBox(height: 20),
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => RegisterScreen()),
-                  );
+                  NavigationService.navigateTo('/register');
                 },
                 child: Text.rich(
                   TextSpan(

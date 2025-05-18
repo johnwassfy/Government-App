@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
-import 'register_screen.dart';
+import '../services/navigation_service.dart';
 
 class StartScreen extends StatelessWidget {
   @override
@@ -47,8 +46,7 @@ class StartScreen extends StatelessWidget {
                       ),
                       elevation: 5,
                     ),
-                    onPressed: () => Navigator.push(
-                        context, MaterialPageRoute(builder: (_) => LoginScreen())),
+                    onPressed: () => NavigationService.navigateTo('/login'),
                     child: Text('LOGIN',
                         style: TextStyle(
                           fontSize: 16,
@@ -67,8 +65,7 @@ class StartScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed: () => Navigator.push(
-                        context, MaterialPageRoute(builder: (_) => RegisterScreen())),
+                    onPressed: () => NavigationService.navigateTo('/register'),
                     child: Text('REGISTER',
                         style: TextStyle(
                           fontSize: 16,

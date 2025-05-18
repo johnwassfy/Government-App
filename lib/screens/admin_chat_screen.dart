@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:project/services/firebase_service.dart';
-import 'admin_dashboard.dart';
-import 'admin_chat_details_screen.dart';
+import '../services/navigation_service.dart';
 
 class AdminChatScreen extends StatelessWidget {
   final FirebaseService _firebaseService = FirebaseService();
@@ -14,9 +13,7 @@ class AdminChatScreen extends StatelessWidget {
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => AdminDashboard()),
-            );
+            NavigationService.replaceTo('/admin');
           },
         ),
         title: Text('Citizen Messages', style: TextStyle(color: Colors.white)),
@@ -71,15 +68,10 @@ class AdminChatScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 12),
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AdminChatDetailScreen(
-                            userId: userId,
-                            userName: userSnapshot.data ?? 'User',
-                          ),
-                        ),
-                      );
+                      NavigationService.navigateTo('/admin/chat/detail', arguments: {
+                        'userId': userId,
+                        'userName': userSnapshot.data ?? 'User',
+                      });
                     },
                   );
                 },

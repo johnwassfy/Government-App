@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project/services/navigation_service.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -7,10 +8,8 @@ import '../models/advertisement_model.dart';
 import '../models/poll_model.dart';
 import '../providers/announcement_provider.dart';
 import '../services/firebase_service.dart';
-import 'announcement_detail_screen.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
-import 'package:project/screens/poll_details_screen.dart';
 import 'emergency_contacts_screen.dart';
 
 class CitizenDashboard extends StatefulWidget {
@@ -36,7 +35,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
 
   void _logout() {
     FirebaseAuth.instance.signOut();
-    Navigator.pushReplacementNamed(context, '/');
+    NavigationService.navigateTo('/');
   }
 
   @override
@@ -227,12 +226,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AnnouncementDetailScreen(announcement: ann),
-            ),
-          );
+          NavigationService.navigateTo('/announcement_detail', arguments: {'announcement': ann});
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -293,12 +287,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PollDetailsScreen(poll: poll),
-            ),
-          );
+          NavigationService.navigateTo('/poll_detail', arguments: {'poll': poll});
         },
       child: Padding(
         padding: const EdgeInsets.all(16),

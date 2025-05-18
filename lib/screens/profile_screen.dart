@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'citizen_dashboard.dart';
 import 'package:project/services/firebase_service.dart';
-
+import "../services/navigation_service.dart";
 class ProfileScreen extends StatefulWidget {
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -46,7 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout() async {
     try {
       await _auth.signOut();
-      Navigator.pushReplacementNamed(context, '/');
+      NavigationService.navigateToAndClearStack('/');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error signing out: $e')),
@@ -61,10 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => CitizenDashboard(),
-              ), (Route<dynamic> route) => false,);
+            NavigationService.navigateToAndClearStack('/citizen');
           },
         ),
         title: Text('My Profile'),
@@ -220,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => NavigationService.goBack(),
             child: Text('Cancel'),
           ),
           ElevatedButton(
@@ -249,6 +245,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Password updated successfully')),
                 );
+                // When password is updated successfully
+                NavigationService.goBack();
               } on FirebaseAuthException catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error: ${e.message}')),
@@ -262,35 +260,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _navigateToPersonalInfo() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text('Personal Information'),
-          ),
-          body: Center(
-            child: Text('Personal Information Screen'),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _navigateToHelpSupport() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text('Help & Support'),
-          ),
-          body: Center(
-            child: Text('Help & Support Screen'),
-          ),
-        ),
-      ),
-    );
+    NavigationService.navigateTo('/help_support');
   }
-}
+  void _navigateToPersonalInfo() {
+    NavigationService.navigateTo('/personal_info');
+  }}

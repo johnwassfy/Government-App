@@ -4,8 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/announcement_provider.dart';
-import 'screens/start_screen.dart';
 import 'services/firebase_service.dart';
+import 'routes.dart';
+import 'services/navigation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,12 +21,18 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AnnouncementProvider()),
-        Provider(create: (_) => FirebaseService()), // Add this line
+        Provider(create: (_) => FirebaseService()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Gov App',
-        home: StartScreen(),
+        title: 'GovConnect',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        navigatorKey: NavigationService.navigatorKey,
+        initialRoute: '/',
+        routes: AppRoutes.routes,
+        onGenerateRoute: AppRoutes.onGenerateRoute,
       ),
     );
   }
