@@ -121,6 +121,15 @@ class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
                 final isApproved = ad['isApproved'] ?? false;
                 final reason = ad['reason'] ?? '';
                 final userId = (ad['createdBy'] as DocumentReference).id;
+                String? imageUrl;
+                try {
+                  // Check if the field exists before trying to access it
+                  if (ad.data() is Map && (ad.data() as Map).containsKey('imageUrl')) {
+                    imageUrl = ad['imageUrl'];
+                  }
+                } catch (e) {
+                  imageUrl = null; // Handle any errors
+                }
 
                 return FutureBuilder<String>(
                   future: FirebaseService().getUserFullName(userId),
@@ -135,6 +144,7 @@ class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
                         username: 'Loading...',
                         isPending: false,
                         reason: reason,
+                        imageUrl: imageUrl, // Pass imageUrl
                         onApprove: null,
                         onDecline: null,
                       );
@@ -156,6 +166,7 @@ class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
                       username: username,
                       isPending: isPending,
                       reason: reason,
+                      imageUrl: imageUrl, // Use the safely retrieved imageUrl
                       onApprove: isPending ? () async {
                         try {
                           final updatedAd = {
@@ -257,87 +268,123 @@ class _AdminAdvertisementsScreenState extends State<AdminAdvertisementsScreen> {
     required String username,
     required bool isPending,
     required String reason,
+    String? imageUrl, // Add imageUrl parameter
     VoidCallback? onApprove,
     VoidCallback? onDecline,
   }) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    subject,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade800,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            _buildInfoRow(Icons.person, username),
-            _buildInfoRow(Icons.calendar_today, 
-                '${createdAt.day}/${createdAt.month}/${createdAt.year} ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}'),
-            if (!isPending && reason.isNotEmpty && reason != 'null')
-              _buildInfoRow(Icons.info, 'Decline Reason: $reason', color: Colors.red),
-            if (isPending)
-              Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: Icon(Icons.close, color: Colors.red),
-                      label: Text('Decline', style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.red),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Display image if available
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error loading image: $error');
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: Center(
+                        child: Icon(
+                          Icons.image_not_supported,
+                          color: Colors.grey.shade400,
+                          size: 48,
                         ),
                       ),
-                      onPressed: onDecline,
+                    );
+                  },
+                ),
+              ),
+            ),
+            
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        subject,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
+                      ),
                     ),
-                    SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: onApprove,
-                      icon: Icon(Icons.check, color: Colors.white),
-                      label: Text('Approve', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: statusColor),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-          ],
-        ),
+                SizedBox(height: 12),
+                _buildInfoRow(Icons.person, username),
+                _buildInfoRow(Icons.calendar_today, 
+                    '${createdAt.day}/${createdAt.month}/${createdAt.year} ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}'),
+                if (!isPending && reason.isNotEmpty && reason != 'null')
+                  _buildInfoRow(Icons.info, 'Decline Reason: $reason', color: Colors.red),
+                if (isPending)
+                  Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: Icon(Icons.close, color: Colors.red),
+                          label: Text('Decline', style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: onDecline,
+                        ),
+                        SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: onApprove,
+                          icon: Icon(Icons.check, color: Colors.white),
+                          label: Text('Approve', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

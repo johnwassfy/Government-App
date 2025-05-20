@@ -10,13 +10,21 @@ class AnnouncementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = DateFormat.yMMMd().add_jm().format(announcement.createdAt.toDate());
+    // Safe date formatting with try-catch
+    String formattedDate;
+    try {
+      formattedDate = announcement.date != 'null'
+          ? DateFormat.yMMMd().add_jm().format(announcement.date)
+          : 'Date not available';
+    } catch (e) {
+      formattedDate = 'Date not available';
+    }
 
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: ListTile(
-        title: Text(announcement.announcement),
-        subtitle: Text("Published on $date"),
+        title: Text(announcement.subject),
+        subtitle: Text("Published on $formattedDate"),
         leading: Icon(Icons.announcement),
       ),
     );

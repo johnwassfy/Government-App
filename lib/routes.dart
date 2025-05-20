@@ -16,6 +16,10 @@ import '../screens/admin_chat_screen.dart';
 import '../screens/create_advertisement_screen.dart';
 import '../screens/announcement_detail_screen.dart';
 import '../screens/poll_details_screen.dart';
+import '../screens/report_screen.dart';
+import '../screens/user_report_screen.dart';
+import '../screens/admin_report_screen.dart';
+import '../screens/advertisement_detail_screen.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
@@ -49,6 +53,9 @@ class AppRoutes {
         child: Text('Help & Support Screen'),
       ),
     ),
+    '/report_problem': (context) => ReportProblemScreen(),
+    '/user_reports': (context) => UserReportsScreen(),
+    '/admin/reports': (context) => AdminReportsScreen(),
   };
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
@@ -77,6 +84,15 @@ class AppRoutes {
         builder: (_) => AdminChatDetailScreen(
           userId: args['userId'],
           userName: args['userName'],
+        ),
+      );
+    }
+
+    if (settings.name == '/advertisement_detail') {
+      final args = settings.arguments as Map<String, dynamic>;
+      return MaterialPageRoute(
+        builder: (_) => AdvertisementDetailScreen(
+          advertisement: args['advertisement'],
         ),
       );
     }

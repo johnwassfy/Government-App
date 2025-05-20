@@ -128,6 +128,11 @@ class _DashboardScreen extends StatelessWidget {
         icon: Icons.phone,
         expandableContent: OfficialPhoneNumbersSection(isAdmin: true),
       ),
+      _DashboardCard(
+        title: 'Citizen Reports',
+        icon: Icons.report_problem,
+        onTap: () => NavigationService.navigateTo('/admin/reports'),
+      ),
       ],
     );
   }

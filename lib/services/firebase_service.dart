@@ -4,7 +4,10 @@ import 'package:project/models/announcement_model.dart';
 import 'package:project/models/comment_model.dart';
 import 'package:project/models/advertisement_model.dart';
 import 'package:project/models/poll_model.dart';
+import 'package:project/models/report_model.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:project/services/image_service.dart';
 
 class FirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -51,15 +54,21 @@ class FirebaseService {
   }
 
   Future<void> addAnnouncement(Announcement announcement) async {
-    try {
-      await _db.collection('announcements').add(announcement.toMap());
-    } catch (e) {
-      throw Exception("Failed to add announcement: $e");
-    }
+    final data = announcement.toJson();
+    // Ensure both date fields are set
+    data['date'] = Timestamp.fromDate(announcement.date);
+    data['createdAt'] = Timestamp.fromDate(announcement.date);
+    
+    await FirebaseFirestore.instance.collection('announcements').add(data);
   }
-
+    
   Future<void> updateAnnouncement(String id, Announcement announcement) async {
-    await _db.collection('announcements').doc(id).update(announcement.toMap());
+    final data = announcement.toJson();
+    // Ensure both date fields are set
+    data['date'] = Timestamp.fromDate(announcement.date);
+    data['createdAt'] = Timestamp.fromDate(announcement.date);
+    
+    await FirebaseFirestore.instance.collection('announcements').doc(id).update(data);
   }
 
   Future<void> deleteAnnouncement(String id) async {
@@ -115,7 +124,7 @@ class FirebaseService {
       .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snapshot) => snapshot.docs
-          .map((doc) => Advertisement.fromJson(doc.data()))
+          .map((doc) => Advertisement.fromJson(doc.data(), id: doc.id))
           .toList());
 }
 
@@ -337,12 +346,62 @@ Future<void> deleteAdvertisement(String id) async {
     }
   }
 
-Stream<List<Poll>> getPollsStream() {
-  return _db.collection('polls')
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          .map((doc) => Poll.fromDocument(doc))
-          .toList());
-}
+  Stream<List<Poll>> getPollsStream() {
+    return _db.collection('polls')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Poll.fromDocument(doc))
+            .toList());
+  }
+
+  
+  // -------------- REPORTS --------------
+  
+  Future<void> createReport(Report report) async {
+    try {
+      await _db.collection('reports').add(report.toMap());
+    } catch (e) {
+      print('Error creating report: $e');
+      throw Exception('Failed to submit report');
+    }
+  }
+  
+  Stream<List<Report>> getUserReportsStream(String userId) {
+    return _db
+        .collection('reports')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Report.fromDocument(doc))
+            .toList());
+  }
+  
+  Stream<List<Report>> getAllReportsStream() {
+    return _db
+        .collection('reports')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Report.fromDocument(doc))
+            .toList());
+  }
+  
+  Future<void> updateReportStatus(String reportId, String status, {String? adminResponse}) async {
+    final updateData = {
+      'status': status,
+    };
+    
+    if (adminResponse != null) {
+      updateData['adminResponse'] = adminResponse;
+    }
+    
+    await _db.collection('reports').doc(reportId).update(updateData);
+  }
+  
+  Future<String> uploadReportImage(String reportId, String imagePath) async {
+    return await ImageService.uploadImage(File(imagePath));
+  }
+
 }

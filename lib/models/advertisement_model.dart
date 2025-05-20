@@ -4,7 +4,7 @@ class Advertisement {
   final String id;
   final String subject;
   final String description;
-  final String? imagePath; // local path
+  final String? imageUrl; // Change from imagePath to imageUrl
   final DocumentReference createdBy;
   final Timestamp createdAt;
   final bool isApproved;
@@ -14,34 +14,35 @@ class Advertisement {
     required this.id,
     required this.subject,
     required this.description,
-    this.imagePath,
+    this.imageUrl, // Now accepts imageUrl instead of imagePath
     required this.createdBy,
     required this.createdAt,
     required this.isApproved,
     required this.reason,
   });
 
-  // Factory constructor to create an instance from a Map
-  factory Advertisement.fromJson(Map<String, dynamic> data) {
+  factory Advertisement.fromJson(Map<String, dynamic> json, {String? id}) {
     return Advertisement(
-      id: data['id'] ?? '', // Make sure to handle null or missing fields
-      subject: data['subject'] ?? '',
-      description: data['description'] ?? '',
-      imagePath: data['imagePath'],
-      createdBy: data['createdBy'] ?? '',
-      createdAt: data['createdAt'] ?? Timestamp.now(),
-      isApproved: data['isApproved'] ?? false, // Default value
-      reason: data['reason'] == 'null' ? '' : data['reason'] ?? '',
+      id: id ?? json['id'] ?? '',
+      subject: json['subject'] ?? '',
+      description: json['description'] ?? '',
+      imageUrl: json['imageUrl'], // This will be null if imageUrl doesn't exist
+      createdBy: json['createdBy'] is DocumentReference 
+          ? json['createdBy'] as DocumentReference
+          : FirebaseFirestore.instance.doc('users/unknown'),
+      createdAt: json['createdAt'] is Timestamp 
+          ? json['createdAt'] as Timestamp 
+          : Timestamp.now(),
+      isApproved: json['isApproved'] ?? false,
+      reason: json['reason'] ?? 'null',
     );
   }
 
-  // Method to convert the instance to a Map (for serialization)
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'subject': subject,
       'description': description,
-      'imagePath': imagePath,
+      if (imageUrl != null) 'imageUrl': imageUrl, // Only include if not null
       'createdBy': createdBy,
       'createdAt': createdAt,
       'isApproved': isApproved,

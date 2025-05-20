@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'announcement_detail_screen.dart';
 import '../services/firebase_service.dart';
 import '../models/announcement_model.dart';
-
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../services/image_service.dart';
 class AdminAnnouncementsScreen extends StatefulWidget {
   @override
   _AdminAnnouncementsScreenState createState() =>
@@ -17,6 +19,50 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   final FirebaseService _firebaseService = FirebaseService();
 
+  File? _selectedImage;
+  bool _isUploading = false;
+  String? _uploadedImageUrl;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+    
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  // Replace the _uploadImage function with this
+  Future<String?> _uploadImage() async {
+    if (_selectedImage == null) return null;
+    
+    setState(() {
+      _isUploading = true;
+    });
+    
+    try {
+      // Use ImageService instead of direct Firebase Storage access
+      final imageUrl = await ImageService.uploadImage(_selectedImage!);
+      return imageUrl;
+    } catch (e) {
+      print('Error uploading image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload image'))
+      );
+      return null;
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  // Update your existing _uploadAnnouncement method to handle images
   Future<void> _uploadAnnouncement({String? docId}) async {
     if (_subjectController.text.isEmpty || _bodyController.text.isEmpty) return;
 
@@ -27,15 +73,24 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       return;
     }
 
-    final createdByRef =
-        FirebaseFirestore.instance.collection('users').doc(currentUserId);
+    // Upload image if selected
+    String? imageUrl;
+    if (_selectedImage != null) {
+      imageUrl = await _uploadImage();
+    }
 
+    if (imageUrl == null && _selectedImage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image')));
+      return;
+    }
+    
     final announcement = Announcement(
       id: docId ?? '',
       subject: _subjectController.text,
       announcement: _bodyController.text,
-      createdAt: Timestamp.now(),
-      createdBy: createdByRef,
+      date: DateTime.now(),
+      imageUrl: imageUrl, // Add the image URL
     );
 
     if (docId != null) {
@@ -44,6 +99,12 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       await _firebaseService.addAnnouncement(announcement);
     }
 
+    // Clear the image state
+    setState(() {
+      _selectedImage = null;
+      _uploadedImageUrl = null;
+    });
+
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('Announcement posted!')));
     _subjectController.clear();
@@ -51,39 +112,142 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     Navigator.of(context).pop(); // close bottom sheet if open
   }
 
+  // Update your existing _showEditForm to handle images
   void _showEditForm({Announcement? existing}) {
     if (existing != null) {
       _subjectController.text = existing.subject;
       _bodyController.text = existing.announcement;
+      setState(() {
+        _selectedImage = null;
+        _uploadedImageUrl = existing.imageUrl;
+      });
     } else {
       _subjectController.clear();
       _bodyController.clear();
+      setState(() {
+        _selectedImage = null;
+        _uploadedImageUrl = null;
+      });
     }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(existing == null ? 'New Announcement' : 'Edit Announcement'),
-            TextField(
-              controller: _subjectController,
-              decoration: InputDecoration(labelText: 'Subject'),
-            ),
-            TextField(
-              controller: _bodyController,
-              decoration: InputDecoration(labelText: 'Announcement'),
-              maxLines: 6,
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () => _uploadAnnouncement(docId: existing?.id),
-              child: Text(existing == null ? 'Post' : 'Update'),
-            )
-          ],
+      builder: (_) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                existing == null ? 'New Announcement' : 'Edit Announcement',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: _subjectController,
+                decoration: InputDecoration(labelText: 'Subject'),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: _bodyController,
+                decoration: InputDecoration(labelText: 'Announcement'),
+                maxLines: 6,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Attachment (Optional):',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              if (_selectedImage != null)
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: FileImage(_selectedImage!),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: CircleAvatar(
+                        backgroundColor: Colors.red,
+                        radius: 14,
+                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                      ),
+                      onPressed: () {
+                        setModalState(() {
+                          _selectedImage = null;
+                          _uploadedImageUrl = null;
+                        });
+                      },
+                    ),
+                  ],
+                )
+              else if (_uploadedImageUrl != null)
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(_uploadedImageUrl!),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: CircleAvatar(
+                        backgroundColor: Colors.red,
+                        radius: 14,
+                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                      ),
+                      onPressed: () {
+                        setModalState(() {
+                          _uploadedImageUrl = null;
+                        });
+                      },
+                    ),
+                  ],
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await _pickImage();
+                    setModalState(() {}); // Refresh bottom sheet UI
+                  },
+                  icon: Icon(Icons.image),
+                  label: Text('Add Image'),
+                ),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel'),
+                  ),
+                  SizedBox(width: 8),
+                  _isUploading
+                      ? CircularProgressIndicator()
+                      : ElevatedButton(
+                          onPressed: () => _uploadAnnouncement(docId: existing?.id),
+                          child: Text(existing == null ? 'Post' : 'Update'),
+                        ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -91,10 +255,19 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
 
   void _viewComments(Announcement announcement) {
+      // Ensure the announcement has a valid date
+    final safeAnnouncement = announcement.date != 'null' ? announcement : Announcement(
+      id: announcement.id,
+      subject: announcement.subject,
+      announcement: announcement.announcement,
+      date: DateTime.now(), // Provide a default date
+      imageUrl: announcement.imageUrl,
+    );
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AnnouncementDetailScreen(
-          announcement: announcement,
+          announcement: safeAnnouncement,
           allowCommenting: false,
         ),
       ),
@@ -111,7 +284,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add, size: 28),
-            onPressed: () => _showEditForm(),
+            onPressed: () => _showEditForm(), // Use _showEditForm instead of _showAddAnnouncementDialog
             tooltip: 'Create new announcement',
           )
         ],
@@ -232,7 +405,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                                 ),
                                 IconButton(
                                   icon: Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showEditForm(existing: announcement),
+                                  onPressed: () => _showEditForm(existing: announcement), // Use _showEditForm instead of _showEditAnnouncementDialog
                                 ),
                               ],
                             ),
@@ -247,7 +420,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                _formatDate(announcement.createdAt.toDate()),
+                                _formatDate(announcement.date),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -268,7 +441,8 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Date not available';
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

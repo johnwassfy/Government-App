@@ -11,6 +11,7 @@ import '../services/firebase_service.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
 import 'emergency_contacts_screen.dart';
+import 'user_report_screen.dart';
 
 class CitizenDashboard extends StatefulWidget {
   @override
@@ -97,6 +98,10 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
             icon: Icon(Icons.person),
             label: 'Profile',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'Reports',
+          ),
         ],
       ),
     );
@@ -106,6 +111,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     if (_currentIndex == 1) return MessagesScreen();
     if (_currentIndex == 2) return EmergencyContactsScreen();
     if (_currentIndex == 3) return ProfileScreen();
+    if (_currentIndex == 4) return UserReportsScreen();
 
     return FutureBuilder(
       future: _future,
@@ -430,40 +436,98 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.campaign, color: Colors.orange),
-                SizedBox(width: 8),
-                Text(
-                  'Sponsored',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          NavigationService.navigateTo('/advertisement_detail', arguments: {'advertisement': ad});
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.campaign, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text(
+                    'Sponsored',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Text(
+                ad.subject,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                ad.description.length > 100
+                    ? '${ad.description.substring(0, 100)}...'
+                    : ad.description,
+                style: TextStyle(fontSize: 16),
+              ),
+              if (ad.imageUrl != null) ...[
+                SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    ad.imageUrl!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 100,
+                        width: double.infinity,
+                        color: Colors.grey.shade200,
+                        child: Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      );
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 100,
+                        width: double.infinity,
+                        color: Colors.grey.shade100,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded / 
+                                  loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              ad.subject,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'View details',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward, size: 16, color: Colors.blue),
+                ],
               ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              ad.description.length > 100
-                  ? '${ad.description.substring(0, 100)}...'
-                  : ad.description,
-              style: TextStyle(fontSize: 16),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

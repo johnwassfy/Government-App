@@ -71,7 +71,7 @@ class _AdvertiserDashboardState extends State<AdvertiserDashboard> {
         labelStyle: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold),
         avatar: Icon(Icons.check_circle, color: Colors.green.shade800, size: 18),
       );
-    } else if (ad.reason.isNotEmpty) {
+    } else if (ad.reason.isNotEmpty && ad.reason != 'null') {
       return Chip(
         label: Text('Declined'),
         backgroundColor: Colors.red.shade100,
@@ -155,49 +155,68 @@ class _AdvertiserDashboardState extends State<AdvertiserDashboard> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.campaign, color: theme.primaryColor),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  ad.subject,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Text(ad.description),
-                          SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildStatusChip(ad),
-                              if (ad.reason.isNotEmpty && !ad.isApproved)
-                                Icon(Icons.info_outline, color: Colors.red.shade300),
-                            ],
-                          ),
-                          if (ad.reason.isNotEmpty && !ad.isApproved) ...[
-                            SizedBox(height: 8),
-                            Text(
-                              'Reason: ${ad.reason}',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontStyle: FontStyle.italic,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Display image if available
+                        if (ad.imageUrl != null && ad.imageUrl!.isNotEmpty)
+                          Container(
+                            height: 180,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                              image: DecorationImage(
+                                image: NetworkImage(ad.imageUrl!),
+                                fit: BoxFit.cover,
                               ),
                             ),
-                          ],
-                        ],
-                      ),
+                          ),
+                          
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.campaign, color: theme.primaryColor),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      ad.subject,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              Text(ad.description),
+                              SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildStatusChip(ad),
+                                  if (ad.reason.isNotEmpty && !ad.isApproved && ad.reason != 'null')
+                                    Icon(Icons.info_outline, color: Colors.red.shade300),
+                                ],
+                              ),
+                              if (ad.reason.isNotEmpty && !ad.isApproved && ad.reason != 'null') ...[
+                                SizedBox(height: 8),
+                                Text(
+                                  'Reason: ${ad.reason}',
+                                  style: TextStyle(
+                                    color: Colors.red.shade700,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
